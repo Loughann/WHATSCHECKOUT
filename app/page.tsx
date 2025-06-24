@@ -216,10 +216,10 @@ export default function CheckoutPage() {
   }
 
   useEffect(() => {
-    // Dispara o evento InitializeCheckout quando o componente é montado
-    // if (typeof window !== "undefined" && (window as any).fbq) {
-    //   ;(window as any).fbq("track", "InitiateCheckout")
-    // }
+    // Dispara o evento InitiateCheckout quando o componente é montado
+    if (typeof window !== "undefined" && (window as any).fbq) {
+      ;(window as any).fbq("track", "InitiateCheckout")
+    }
 
     if (transactionId && paymentStatus === "pending") {
       intervalRef.current = setInterval(() => handleVerifyPix(transactionId), 4000)
