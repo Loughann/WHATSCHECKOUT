@@ -62,8 +62,8 @@ export default function CheckoutPage() {
   const [customerEmail, setCustomerEmail] = useState("")
 
   const itemTitle = "BLCKX7" // Nome do produto para a API
-  const itemPrice = 14.9 // Alterado de 9.9 para 14.9
-  const totalAmount = 14.9 // Alterado de 9.9 para 14.9
+  const itemPrice = 9.9 // Alterado de 14.9 para 9.9
+  const totalAmount = 9.9 // Alterado de 14.9 para 9.9
 
   const description = "Pagamento do BLCKX7" // Descrição para a API
 
@@ -837,8 +837,8 @@ export default function CheckoutPage() {
                         2 relatórios completos. Perfeito para investigar mais pessoas.
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        <span className="text-muted-foreground line-through text-xs">R$ 29,90</span>
-                        <span className="text-green-500 font-bold text-lg">R$ 14,90</span>
+                        <span className="text-muted-foreground line-through text-xs">R$ 19,90</span>
+                        <span className="text-green-500 font-bold text-lg">R$ 9,90</span>
                         <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded">50% OFF</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
