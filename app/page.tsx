@@ -910,11 +910,12 @@ export default function CheckoutPage() {
                     <label htmlFor="relatorio" className="cursor-pointer">
                       <h3 className="font-bold text-foreground text-lg leading-tight">📊 Atualizações Secretas por 7 Dias</h3>
                       <p className="text-muted-foreground text-sm mt-1 leading-tight">
-                        Receba relatórios semanais com novos acessos e descobertas. Tudo isso sem levantar suspeitas. 🔐 Ideal pra quem quer monitoramento constante.
+                        Receba relatórios semanais com novos acessos e descobertas. Tudo isso sem levantar suspeitas. 
+                       🔐 Ideal pra quem quer monitoramento constante.
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        <span className="text-muted-foreground line-through text-xs">R$ 29,90</span>
-                        <span className="text-green-500 font-bold text-lg">R$ 14,90</span>
+                        <span className="text-muted-foreground line-through text-xs">R$ 19,90</span>
+                        <span className="text-green-500 font-bold text-lg">R$ 7,90</span>
                         <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded">50% OFF</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
