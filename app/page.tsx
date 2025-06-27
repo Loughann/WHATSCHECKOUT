@@ -831,10 +831,10 @@ export default function CheckoutPage() {
                   <div className="flex-1 min-w-0">
                     <label htmlFor="investigacao" className="cursor-pointer">
                       <h3 className="font-bold text-foreground text-lg leading-tight">
-                        ✅ 2 Investigações pelo preço de 1
+                        ✅ 2 Investigações pelo Preço de 1 (EXCLUSIVO)
                       </h3>
                       <p className="text-muted-foreground text-sm mt-1 leading-tight">
-                        2 relatórios completos. Perfeito para investigar mais pessoas.
+                        Descubra tudo sobre duas pessoas diferentes com um único clique ou descubra mais da mesma pessoa! 
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
                         <span className="text-muted-foreground line-through text-xs">R$ 19,90</span>
@@ -870,9 +870,9 @@ export default function CheckoutPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <label htmlFor="localizacao" className="cursor-pointer">
-                      <h3 className="font-bold text-foreground text-lg leading-tight">📍 Whats Premium</h3>
+                      <h3 className="font-bold text-foreground text-lg leading-tight">📍 Whats Premium: Acesso Espelhado</h3>
                       <p className="text-muted-foreground text-sm mt-1 leading-tight">
-                        Tenha o seu e o dele no mesmo celular! por que não?
+                        Veja tudo o que acontece no WhatsApp dele sem sair do seu celular. Mais praticidade, mais controle.
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
                         <span className="text-muted-foreground line-through text-xs">R$ 14,90</span>
@@ -908,9 +908,9 @@ export default function CheckoutPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <label htmlFor="relatorio" className="cursor-pointer">
-                      <h3 className="font-bold text-foreground text-lg leading-tight">📊 Relatório Semanal</h3>
+                      <h3 className="font-bold text-foreground text-lg leading-tight">📊 Atualizações Secretas por 7 Dias</h3>
                       <p className="text-muted-foreground text-sm mt-1 leading-tight">
-                        Atualizações importantes toda semana de forma anônima.
+                        Receba relatórios semanais com novos acessos e descobertas. Tudo isso sem levantar suspeitas. 🔐 Ideal pra quem quer monitoramento constante.
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
                         <span className="text-muted-foreground line-through text-xs">R$ 29,90</span>
