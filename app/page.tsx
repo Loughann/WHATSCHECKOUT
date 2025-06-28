@@ -1,14 +1,14 @@
 "use client"
-
-import type * as React from "react"
 import { useState, useEffect, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation" // Importar useRouter
+import type React from "react"
+
+import { useRouter, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Copy, Loader2, ShieldCheck, Lock, Clock, Square, Star } from "lucide-react"
+import { Copy, Loader2, ShieldCheck, Lock, Clock, Square, Star, Zap } from "lucide-react"
 import QRCode from "react-qr-code"
 import { MatrixBackground } from "@/components/matrix-background"
 
@@ -49,7 +49,7 @@ interface VerifyPixResponse {
 
 // -------- COMPONENTE --------
 export default function CheckoutPage() {
-  const router = useRouter() // Inicializar useRouter
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [pixCode, setPixCode] = useState<string | null>(null)
   const [transactionId, setTransactionId] = useState<string | null>(null)
@@ -58,16 +58,16 @@ export default function CheckoutPage() {
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const bonusTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const entryTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const [customerEmail, setCustomerEmail] = useState("")
 
-  const itemTitle = "BLCKX7" // Nome do produto para a API
-  const itemPrice = 9.9 // Alterado de 14.9 para 9.9
-  const totalAmount = 9.9 // Alterado de 14.9 para 9.9
+  const itemTitle = "BLCKX7"
+  const itemPrice = 9.9
+  const totalAmount = 9.9
 
-  const description = "Pagamento do BLCKX7" // Descrição para a API
+  const description = "Pagamento do BLCKX7"
 
-  // Adicionar novos estados para o modal de orderbumps
   const [showOrderBumps, setShowOrderBumps] = useState(false)
   const [selectedOrderBumps, setSelectedOrderBumps] = useState({
     investigacao: false,
@@ -75,59 +75,94 @@ export default function CheckoutPage() {
     relatorio: false,
   })
 
-  // Adicionar um novo estado para controlar o modal de instruções:
   const [showInstructions, setShowInstructions] = useState(false)
-
-  // Estado para o countdown de escassez
-  const [timeLeft, setTimeLeft] = useState(942) // 15 minutos e 42 segundos
-  // Remover o estado isUrgent pois não será mais usado
-  // const [isUrgent, setIsUrgent] = useState(false)
-
+  const [timeLeft, setTimeLeft] = useState(300)
   const [currentTestimonial, setCurrentTestimonial] = useState(0)
-
-  // Adicionar um novo estado para controlar o pop-up de bônus após os outros estados:
   const [showBonusPopup, setShowBonusPopup] = useState(false)
-  const [bonusTimeLeft, setBonusTimeLeft] = useState(300) // 5 minutos em segundos
-  const [orderBumpTimeLeft, setOrderBumpTimeLeft] = useState(180) // 3 minutos em segundos
-
-  // Adicionar após os outros estados
+  const [bonusTimeLeft, setBonusTimeLeft] = useState(300)
+  const [orderBumpTimeLeft, setOrderBumpTimeLeft] = useState(180)
   const [bonusPopupShown, setBonusPopupShown] = useState(false)
   const [bonusPopupShownAfterCopy, setBonusPopupShownAfterCopy] = useState(false)
+  const [pixExpirationTime, setPixExpirationTime] = useState(600)
 
-  const [pixExpirationTime, setPixExpirationTime] = useState(600) // 10 minutos em segundos
+  // Estados para o pop-up de entrada
+  const [showEntryBonus, setShowEntryBonus] = useState(false)
+  const [entryBonusTimeLeft, setEntryBonusTimeLeft] = useState(300)
+  const [entryBonusAccepted, setEntryBonusAccepted] = useState(false)
 
-  // Modificar a função handleGeneratePix para mostrar o modal primeiro
+  // Estados para o pop-up de alerta após 60 segundos
+  const [showTimeAlert, setShowTimeAlert] = useState(false)
+  const [timeAlertShown, setTimeAlertShown] = useState(false)
+  const timeAlertTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Função para disparar eventos de tracking
+  const trackEvent = (eventName: string, eventData?: any) => {
+    // Facebook Pixel - APENAS InitiateCheckout
+    if (typeof window !== "undefined" && (window as any).fbq) {
+      if (eventName === "InitiateCheckout") {
+        ;(window as any).fbq("track", "InitiateCheckout")
+      }
+    }
+
+    // UTMify - Manter todos os eventos
+    if (typeof window !== "undefined" && (window as any).pixel) {
+      if (eventName === "InitiateCheckout") {
+        ;(window as any).pixel("track", "InitiateCheckout")
+      } else if (eventName === "AddToCart") {
+        ;(window as any).pixel("track", {
+          value: eventData?.value || 0,
+          currency: "BRL",
+        })
+      } else if (eventName === "Purchase") {
+        ;(window as any).pixel("track", {
+          value: eventData?.value || 0,
+          currency: "BRL",
+          transaction_id: eventData?.transaction_id || "",
+        })
+      }
+    }
+  }
+
   async function handleGeneratePix() {
     if (!customerEmail) {
       alert("Por favor, insira seu e-mail.")
       return
     }
 
-    // Mostrar modal de orderbumps primeiro
-    setOrderBumpTimeLeft(180) // Reset para 3 minutos
+    setOrderBumpTimeLeft(180)
     setShowOrderBumps(true)
   }
 
-  // Nova função para processar o PIX após seleção dos orderbumps
   async function processPixGeneration() {
     setShowOrderBumps(false)
     setIsLoadingPix(true)
     setPixCode(null)
     setTransactionId(null)
     setPaymentStatus(null)
-    setPixExpirationTime(600) // Reset para 10 minutos
+    setPixExpirationTime(600)
 
-    // Calcular valor total baseado nos orderbumps selecionados
     let finalAmount = totalAmount
     if (selectedOrderBumps.investigacao) {
-      finalAmount += 9.9
+      finalAmount += 11.9
     }
     if (selectedOrderBumps.localizacao) {
       finalAmount += 6.9
     }
     if (selectedOrderBumps.relatorio) {
-      finalAmount += 14.9
+      finalAmount += 7.9
     }
+
+    // Capturar TODOS os parâmetros da URL como string
+    const urlParams = new URLSearchParams(window.location.search)
+    const allParams: string[] = []
+
+    // Iterar por todos os parâmetros e criar array de strings
+    urlParams.forEach((value, key) => {
+      allParams.push(`${key}=${value}`)
+    })
+
+    // Juntar todos os parâmetros em uma string
+    const utmString = allParams.length > 0 ? allParams.join("&") : "checkout-v0"
 
     const payload: GeneratePixPayload = {
       amount: Math.round(finalAmount * 100),
@@ -143,7 +178,7 @@ export default function CheckoutPage() {
         price: Math.round(finalAmount * 100),
         quantity: 1,
       },
-      utm: searchParams.toString() || "checkout-v0",
+      utm: utmString,
     }
 
     try {
@@ -162,14 +197,14 @@ export default function CheckoutPage() {
       setTransactionId(data.transactionId)
       setPaymentStatus("pending")
 
-      // Dispara evento AddToCart
-      // if (typeof window !== "undefined" && (window as any).fbq) {
-      //   ;(window as any).fbq("track", "AddToCart", {
-      //     value: finalAmount,
-      //     currency: "BRL",
-      //     content_name: "WHATS ESPIÃO",
-      //   })
-      // }
+      // 🎯 TRACKING: AddToCart quando PIX é gerado
+      trackEvent("AddToCart", {
+        value: finalAmount,
+        currency: "BRL",
+        content_name: "WHATS ESPIÃO",
+        content_ids: ["whats-espiao"],
+        content_type: "product",
+      })
     } catch (err) {
       console.error(err)
       alert("Erro ao gerar PIX.")
@@ -191,22 +226,23 @@ export default function CheckoutPage() {
       const data: VerifyPixResponse = await res.json()
       setPaymentStatus(data.status)
 
-      // Dispara o evento Purchase ao confirmar o pagamento como concluído
-      // if (data.status === "completed" && typeof window !== "undefined" && (window as any).fbq) {
-      //   // Calcular valor total incluindo orderbumps
-      //   const finalAmount =
-      //     totalAmount +
-      //     (selectedOrderBumps.investigacao ? 9.9 : 0) +
-      //     (selectedOrderBumps.localizacao ? 6.9 : 0) +
-      //     (selectedOrderBumps.relatorio ? 14.9 : 0)
-      //   ;(window as any).fbq("track", "Purchase", {
-      //     value: finalAmount,
-      //     currency: "BRL",
-      //     content_name: "WHATS ESPIÃO",
-      //     content_ids: ["whats-espiao"],
-      //     content_type: "product",
-      //   })
-      // }
+      // 🎯 TRACKING: Purchase quando pagamento é aprovado
+      if (data.status === "completed") {
+        const finalAmount =
+          totalAmount +
+          (selectedOrderBumps.investigacao ? 11.9 : 0) +
+          (selectedOrderBumps.localizacao ? 6.9 : 0) +
+          (selectedOrderBumps.relatorio ? 7.9 : 0)
+
+        trackEvent("Purchase", {
+          value: finalAmount,
+          currency: "BRL",
+          content_name: "WHATS ESPIÃO",
+          content_ids: ["whats-espiao"],
+          content_type: "product",
+          transaction_id: paymentId,
+        })
+      }
     } catch (err) {
       console.error(err)
       setPaymentStatus("failed")
@@ -215,28 +251,7 @@ export default function CheckoutPage() {
     }
   }
 
-  useEffect(() => {
-    // Dispara o evento InitiateCheckout quando o componente é montado
-    if (typeof window !== "undefined" && (window as any).fbq) {
-      ;(window as any).fbq("track", "InitiateCheckout")
-    }
-
-    if (transactionId && paymentStatus === "pending") {
-      intervalRef.current = setInterval(() => handleVerifyPix(transactionId), 4000)
-    }
-    if (paymentStatus === "completed") {
-      // Redireciona diretamente para o link externo quando o pagamento é concluído
-      window.location.href = "https://premiumespiao.netlify.app"
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    } else if (paymentStatus !== "pending" && intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [transactionId, paymentStatus, router])
-
-  // Simplificar o useEffect do countdown removendo a lógica de urgência
+  // Timer principal da barra de escassez
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -251,23 +266,70 @@ export default function CheckoutPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // Função para iniciar o timer do pop-up de bônus
+  // Mostrar pop-up de entrada após 3 segundos
+  useEffect(() => {
+    console.log("Configurando timer do pop-up de entrada...")
+
+    entryTimerRef.current = setTimeout(() => {
+      console.log("Mostrando pop-up de entrada!")
+      setShowEntryBonus(true)
+      setEntryBonusTimeLeft(timeLeft) // Sincronizado com a barra
+    }, 3000)
+
+    return () => {
+      if (entryTimerRef.current) {
+        clearTimeout(entryTimerRef.current)
+      }
+    }
+  }, []) // Executar apenas uma vez quando o componente monta
+
+  // Sincronizar tempo do desafio com a barra de escassez
+  useEffect(() => {
+    if (showEntryBonus) {
+      setEntryBonusTimeLeft(timeLeft)
+    }
+  }, [timeLeft, showEntryBonus])
+
+  // Fechar pop-up quando tempo da barra acabar
+  useEffect(() => {
+    if (timeLeft <= 0 && showEntryBonus) {
+      setShowEntryBonus(false)
+    }
+  }, [timeLeft, showEntryBonus])
+
+  // Verificação de pagamento e redirecionamento
+  useEffect(() => {
+    // 🎯 TRACKING: InitiateCheckout quando página carrega
+    trackEvent("InitiateCheckout")
+
+    if (transactionId && paymentStatus === "pending") {
+      intervalRef.current = setInterval(() => handleVerifyPix(transactionId), 4000)
+    }
+    if (paymentStatus === "completed") {
+      window.location.href = "https://premiumespiao.netlify.app"
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    } else if (paymentStatus !== "pending" && intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [transactionId, paymentStatus, router])
+
   const startBonusTimer = () => {
     if (bonusTimerRef.current) {
       clearTimeout(bonusTimerRef.current)
     }
 
     bonusTimerRef.current = setTimeout(() => {
-      // Verificar se o usuário ainda está na página e não está com o modal de instruções aberto
       if (document.visibilityState === "visible" && !showInstructions && !bonusPopupShown) {
-        setBonusTimeLeft(300) // Reset para 5 minutos
+        setBonusTimeLeft(300)
         setShowBonusPopup(true)
-        setBonusPopupShown(true) // Marcar que o pop-up foi mostrado
+        setBonusPopupShown(true)
       }
-    }, 12000) // 12 segundos
+    }, 12000)
   }
 
-  // Função para parar o timer do pop-up de bônus
   const stopBonusTimer = () => {
     if (bonusTimerRef.current) {
       clearTimeout(bonusTimerRef.current)
@@ -275,23 +337,18 @@ export default function CheckoutPage() {
     }
   }
 
-  // Pop-up de bônus com controle de visibilidade da página
   useEffect(() => {
     if (pixCode && paymentStatus === "pending" && !showInstructions && !bonusPopupShown && !bonusPopupShownAfterCopy) {
-      // Iniciar o timer apenas se a página estiver visível
       if (document.visibilityState === "visible") {
         startBonusTimer()
       }
 
-      // Listener para mudanças de visibilidade da página
       const handleVisibilityChange = () => {
         if (document.visibilityState === "visible") {
-          // Página ficou visível - iniciar timer se não estiver com modal de instruções aberto
           if (!showInstructions && !showBonusPopup && !bonusPopupShown && !bonusPopupShownAfterCopy) {
             startBonusTimer()
           }
         } else {
-          // Página ficou oculta - parar timer
           stopBonusTimer()
         }
       }
@@ -307,13 +364,12 @@ export default function CheckoutPage() {
     }
   }, [pixCode, paymentStatus, showInstructions, showBonusPopup, bonusPopupShown, bonusPopupShownAfterCopy])
 
-  // Countdown do pop-up de bônus
   useEffect(() => {
     if (showBonusPopup && bonusTimeLeft > 0) {
       const timer = setInterval(() => {
         setBonusTimeLeft((prev) => {
           if (prev <= 1) {
-            setShowBonusPopup(false) // Fecha o pop-up quando o tempo acaba
+            setShowBonusPopup(false)
             return 0
           }
           return prev - 1
@@ -324,25 +380,21 @@ export default function CheckoutPage() {
     }
   }, [showBonusPopup, bonusTimeLeft])
 
-  // Countdown do orderbump
   useEffect(() => {
-    if (showOrderBumps && orderBumpTimeLeft > 0) {
-      const timer = setInterval(() => {
-        setOrderBumpTimeLeft((prev) => {
-          if (prev <= 1) {
-            setShowOrderBumps(false) // Fecha o modal quando o tempo acaba
-            processPixGeneration() // Continua sem orderbumps
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
+    const timer = setInterval(() => {
+      setOrderBumpTimeLeft((prev) => {
+        if (prev <= 1) {
+          setShowOrderBumps(false)
+          processPixGeneration()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
 
-      return () => clearInterval(timer)
-    }
-  }, [showOrderBumps, orderBumpTimeLeft])
+    return () => clearInterval(timer)
+  }, [showOrderBumps, processPixGeneration])
 
-  // Countdown do PIX (10 minutos)
   useEffect(() => {
     if (pixCode && pixExpirationTime > 0) {
       const timer = setInterval(() => {
@@ -359,73 +411,65 @@ export default function CheckoutPage() {
     }
   }, [pixCode, pixExpirationTime])
 
-  // Função para formatar o tempo
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
-  // Função para formatar o tempo do bônus
   const formatBonusTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  // Função para formatar o tempo do orderbump
   const formatOrderBumpTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  // Função para formatar o tempo do PIX
   const formatPixTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  // Função para calcular ofertas disponíveis da primeira oferta (mais rápida)
+  const formatEntryBonusTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
   const getAvailableOffersInvestigacao = () => {
-    const totalTime = 180 // 3 minutos
+    const totalTime = 180
     const timeElapsed = totalTime - orderBumpTimeLeft
 
-    // Lógica de diminuição rápida no início e lenta no final
     let offersReduction = 0
 
-    // Diminui de 9 para 4 ofertas (5 ofertas reduzidas)
     if (timeElapsed <= 30) {
-      // Primeiros 30 segundos: diminui a cada 6 segundos (5-8 segundos)
       offersReduction = Math.floor(timeElapsed / 6)
     } else {
-      // Depois que chega em 4/10: diminui a cada 10 segundos
-      const fastReduction = Math.floor(30 / 6) // 5 ofertas nos primeiros 30s
+      const fastReduction = Math.floor(30 / 6)
       const slowTimeElapsed = timeElapsed - 30
       const slowReduction = Math.floor(slowTimeElapsed / 10)
       offersReduction = fastReduction + slowReduction
     }
 
-    const availableOffers = Math.max(1, 9 - offersReduction)
+    const availableOffers = Math.max(1, 8 - offersReduction)
     return availableOffers
   }
 
-  // Função para calcular ofertas disponíveis da segunda oferta (ritmo normal)
   const getAvailableOffersLocalizacao = () => {
-    const totalTime = 180 // 3 minutos
+    const totalTime = 180
     const timeElapsed = totalTime - orderBumpTimeLeft
 
-    // Lógica de diminuição rápida no início e lenta no final
     let offersReduction = 0
 
-    // Diminui de 9 para 4 ofertas (5 ofertas reduzidas)
     if (timeElapsed <= 50) {
-      // Primeiros 50 segundos: diminui a cada 10 segundos
       offersReduction = Math.floor(timeElapsed / 10)
     } else {
-      // Depois que chega em 4/10: diminui a cada 25 segundos
-      const fastReduction = Math.floor(50 / 10) // 5 ofertas nos primeiros 50s
+      const fastReduction = Math.floor(50 / 10)
       const slowTimeElapsed = timeElapsed - 50
       const slowReduction = Math.floor(slowTimeElapsed / 25)
       offersReduction = fastReduction + slowReduction
@@ -435,42 +479,108 @@ export default function CheckoutPage() {
     return availableOffers
   }
 
-  // Função para calcular ofertas disponíveis da terceira oferta (ritmo normal)
   const getAvailableOffersRelatorio = () => {
-    const totalTime = 180 // 3 minutos
+    const totalTime = 180
     const timeElapsed = totalTime - orderBumpTimeLeft
 
-    // Lógica de diminuição rápida no início e lenta no final
     let offersReduction = 0
 
-    // Diminui de 9 para 4 ofertas (5 ofertas reduzidas)
     if (timeElapsed <= 45) {
-      // Primeiros 45 segundos: diminui a cada 9 segundos (8-10 segundos)
       offersReduction = Math.floor(timeElapsed / 9)
     } else {
-      // Depois que chega em 4/10: diminui a cada 15 segundos
-      const fastReduction = Math.floor(45 / 9) // 5 ofertas nos primeiros 45s
+      const fastReduction = Math.floor(45 / 9)
       const slowTimeElapsed = timeElapsed - 45
       const slowReduction = Math.floor(slowTimeElapsed / 15)
       offersReduction = fastReduction + slowReduction
     }
 
-    const availableOffers = Math.max(1, 9 - offersReduction)
+    const availableOffers = Math.max(1, 7 - offersReduction)
     return availableOffers
   }
+
+  const processPixGenerationRef = useRef(processPixGeneration)
+
+  useEffect(() => {
+    processPixGenerationRef.current = processPixGeneration
+  }, [processPixGeneration])
+
+  useEffect(() => {
+    if (showOrderBumps && orderBumpTimeLeft > 0) {
+      const timer = setInterval(() => {
+        setOrderBumpTimeLeft((prev) => {
+          if (prev <= 1) {
+            setShowOrderBumps(false)
+            processPixGenerationRef.current()
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+
+      return () => clearInterval(timer)
+    }
+  }, [showOrderBumps, orderBumpTimeLeft])
+
+  // Timer para mostrar alerta após 60 segundos sem gerar PIX
+  useEffect(() => {
+    if (!pixCode && !timeAlertShown) {
+      timeAlertTimerRef.current = setTimeout(() => {
+        if (!pixCode && !timeAlertShown) {
+          setShowTimeAlert(true)
+          setTimeAlertShown(true)
+        }
+      }, 60000) // 60 segundos
+    }
+
+    return () => {
+      if (timeAlertTimerRef.current) {
+        clearTimeout(timeAlertTimerRef.current)
+      }
+    }
+  }, [pixCode, timeAlertShown])
+
+  // Limpar timer quando PIX for gerado
+  useEffect(() => {
+    if (pixCode && timeAlertTimerRef.current) {
+      clearTimeout(timeAlertTimerRef.current)
+      setTimeAlertShown(true)
+    }
+  }, [pixCode])
+
+  // Debug: Adicionar logs para verificar o estado
+  console.log("Estados do pop-up:", {
+    showEntryBonus,
+    entryBonusTimeLeft,
+    timeLeft,
+    entryBonusAccepted,
+  })
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative z-10 pt-20">
       {/* BARRA DE ESCASSEZ */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border p-3 text-center">
         <div className="flex flex-col items-center justify-center">
-          <p className="text-base font-semibold text-[#15FF00] text-glow-green flex items-center justify-center">
-            <Clock className="h-5 w-5 mr-2" />
-            Relatório completo se encerra em {formatTime(timeLeft)} minutos
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Relatório completo pronto! Realize o pagamento para receber
-          </p>
+          {timeLeft > 0 ? (
+            <>
+              <p className="text-base font-semibold text-[#15FF00] text-glow-green flex items-center justify-center animate-pulse">
+                <Clock className="h-5 w-5 mr-2" />
+                Restam {formatTime(timeLeft)} minutos para o fim do desafio!
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Seu bônus está ativado! Realize o pagamento agora antes que seja tarde
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-base font-semibold text-red-500 flex items-center justify-center animate-pulse">
+                <Clock className="h-5 w-5 mr-2" />
+                GARANTIR AGORA
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Últimas unidades disponíveis! Garante já o seu relatório
+              </p>
+            </>
+          )}
         </div>
       </div>
       <MatrixBackground />
@@ -479,8 +589,7 @@ export default function CheckoutPage() {
         <CardContent className="p-6 space-y-8">
           {/* HEADER */}
           <div className="text-center">
-            <h1 className="text-6xl font-extrabold uppercase text-[#15FF00] text-glow-green mb-2">{"WHATS ESPIÃO"}</h1>{" "}
-            {/* Título exibido */}
+            <h1 className="text-6xl font-extrabold uppercase text-[#15FF00] text-glow-green mb-2">{"WHATS ESPIÃO"}</h1>
             <p className="text-4xl font-extrabold text-pink-500 mb-2">R$ {totalAmount.toFixed(2).replace(".", ",")}</p>
             <p className="text-sm text-muted">Desconto especial até {new Date().toLocaleDateString("pt-BR")}</p>
           </div>
@@ -526,6 +635,98 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {/* SEÇÃO DE AVALIAÇÕES E SELOS DE SEGURANÇA */}
+          <div className="space-y-6">
+            {/* Avaliações */}
+            <div className="text-center space-y-4">
+              <h3 className="text-lg font-bold text-[#15FF00] text-glow-green">
+                ⭐ Avaliado por mais de 15.000 clientes
+              </h3>
+
+              <div className="flex justify-center items-center space-x-1 mb-2">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="h-6 w-6 fill-yellow-500 text-yellow-500" />
+                ))}
+                <span className="ml-2 text-xl font-bold text-foreground">4.9/5</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-muted/20 border border-border rounded-lg p-2">
+                  <div className="text-lg font-bold text-[#15FF00]">98%</div>
+                  <div className="text-xs text-muted-foreground">Descobriram a verdade</div>
+                </div>
+                <div className="bg-muted/20 border border-border rounded-lg p-2">
+                  <div className="text-lg font-bold text-[#15FF00]">24h</div>
+                  <div className="text-xs text-muted-foreground">Tempo médio de entrega</div>
+                </div>
+                <div className="bg-muted/20 border border-border rounded-lg p-2">
+                  <div className="text-lg font-bold text-[#15FF00]">100%</div>
+                  <div className="text-xs text-muted-foreground">Satisfação garantida</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Selos de Segurança */}
+            <div className="bg-gradient-to-r from-green-900/10 to-emerald-900/10 border border-green-500/20 rounded-lg p-4">
+              <h4 className="text-center text-sm font-bold text-[#15FF00] mb-3">🔒 CERTIFICAÇÕES E GARANTIAS</h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* SSL Certificado */}
+                <div className="flex items-center space-x-2 bg-muted/10 border border-border rounded-lg p-2">
+                  <div className="bg-green-500 rounded-full p-1">
+                    <ShieldCheck className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-foreground">SSL 256-bit</div>
+                    <div className="text-xs text-muted-foreground">Criptografia máxima</div>
+                  </div>
+                </div>
+
+                {/* Pagamento Seguro */}
+                <div className="flex items-center space-x-2 bg-muted/10 border border-border rounded-lg p-2">
+                  <div className="bg-blue-500 rounded-full p-1">
+                    <Lock className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-foreground">PIX Seguro</div>
+                    <div className="text-xs text-muted-foreground">Banco Central</div>
+                  </div>
+                </div>
+
+                {/* Dados Protegidos */}
+                <div className="flex items-center space-x-2 bg-muted/10 border border-border rounded-lg p-2">
+                  <div className="bg-purple-500 rounded-full p-1">
+                    <ShieldCheck className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-foreground">LGPD</div>
+                    <div className="text-xs text-muted-foreground">Dados protegidos</div>
+                  </div>
+                </div>
+
+                {/* Garantia */}
+                <div className="flex items-center space-x-2 bg-muted/10 border border-border rounded-lg p-2">
+                  <div className="bg-yellow-500 rounded-full p-1">
+                    <Star className="h-4 w-4 text-white fill-white" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-foreground">Garantia 7 dias</div>
+                    <div className="text-xs text-muted-foreground">Dinheiro de volta</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Selo Principal */}
+              <div className="mt-4 text-center">
+                <div className="inline-flex items-center bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-500/50 rounded-full px-4 py-2">
+                  <ShieldCheck className="h-5 w-5 text-[#15FF00] mr-2" />
+                  <span className="text-sm font-bold text-[#15FF00]">PAGAMENTO VERIFICADO E LICENCIADO</span>
+                  <ShieldCheck className="h-5 w-5 text-[#15FF00] ml-2" />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* INFO PAGAMENTO */}
           <div>
             <h2 className="text-xl font-bold text-foreground flex items-center mb-4">
@@ -534,7 +735,6 @@ export default function CheckoutPage() {
             </h2>
 
             <Label className="text-foreground font-medium mb-2 block">Método de Pagamento</Label>
-            {/* Ajustado para ter a mesma aparência do campo de e-mail */}
             <div className="w-full flex justify-start items-center border border-border font-normal py-2 px-3 rounded-md bg-white text-black mt-1">
               <Square className="h-5 w-5 fill-green-500 text-green-500 mr-3" />
               PIX - Pagamento Instantâneo
@@ -547,7 +747,6 @@ export default function CheckoutPage() {
               <Loader2 className="h-8 w-8 animate-spin text-green-600" />
             ) : pixCode ? (
               <div className="space-y-3 w-full">
-                {/* Novas informações e botão de copiar */}
                 <p className="text-center text-muted-foreground text-sm">
                   Escaneie o código QR com seu app do banco ou copie o código PIX
                 </p>
@@ -560,7 +759,6 @@ export default function CheckoutPage() {
                     Como fazer pagamento?
                   </Button>
                 )}
-                {/* Fim das novas informações */}
 
                 <div className="flex flex-col items-center">
                   <QRCode value={pixCode} size={150} level="H" />
@@ -571,19 +769,17 @@ export default function CheckoutPage() {
                     Valor: R${" "}
                     {(
                       totalAmount +
-                      (selectedOrderBumps.investigacao ? 9.9 : 0) +
+                      (selectedOrderBumps.investigacao ? 11.9 : 0) +
                       (selectedOrderBumps.localizacao ? 6.9 : 0) +
-                      (selectedOrderBumps.relatorio ? 14.9 : 0)
+                      (selectedOrderBumps.relatorio ? 7.9 : 0)
                     )
                       .toFixed(2)
                       .replace(".", ",")}
                   </p>
-                  {/* Novo elemento de status */}
                   <div className="flex items-center justify-center border border-border rounded-full px-4 py-2 mt-2 bg-muted/20">
                     <Clock className="h-4 w-4 text-muted-foreground mr-2" />
                     <span className="text-sm text-muted-foreground">Status: Aguardando Pagamento</span>
                   </div>
-                  {/* Fim do novo elemento de status */}
                   <Button
                     variant="outline"
                     className="w-full justify-center border border-border font-semibold py-2 px-4 rounded-md bg-white text-black animate-pulse mt-4"
@@ -591,16 +787,15 @@ export default function CheckoutPage() {
                       navigator.clipboard.writeText(pixCode)
                       alert("Código Pix copiado!")
 
-                      // Iniciar timer para mostrar pop-up após copiar (apenas se ainda não foi mostrado)
                       if (!bonusPopupShown && !bonusPopupShownAfterCopy) {
                         setBonusPopupShownAfterCopy(true)
                         setTimeout(() => {
                           if (document.visibilityState === "visible" && !showInstructions && !showBonusPopup) {
-                            setBonusTimeLeft(300) // Reset para 5 minutos
+                            setBonusTimeLeft(300)
                             setShowBonusPopup(true)
-                            setBonusPopupShown(true) // Marcar que o pop-up foi mostrado
+                            setBonusPopupShown(true)
                           }
-                        }, 7000) // 7 segundos após copiar
+                        }, 7000)
                       }
                     }}
                   >
@@ -643,10 +838,10 @@ export default function CheckoutPage() {
               value={customerEmail}
               onChange={(e) => setCustomerEmail(e.target.value)}
               required
-              disabled={pixCode !== null} // Bloqueia o campo quando o PIX é gerado
+              disabled={pixCode !== null}
               className={`bg-white border-border text-black mt-1 placeholder:text-gray-600 ${
                 !customerEmail && !pixCode && paymentStatus !== "completed" ? "border-red-500" : ""
-              } ${pixCode !== null ? "opacity-50 cursor-not-allowed" : ""}`} // Adiciona estilo visual quando bloqueado
+              } ${pixCode !== null ? "opacity-50 cursor-not-allowed" : ""}`}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Precisamos apenas do seu e-mail para enviar o relatório completo de forma segura e anônima
@@ -656,7 +851,7 @@ export default function CheckoutPage() {
           {/* BOTÃO PRINCIPAL */}
           <Button
             onClick={handleGeneratePix}
-            disabled={isLoadingPix || paymentStatus === "completed" || !customerEmail || pixCode !== null} // Adiciona pixCode !== null
+            disabled={isLoadingPix || paymentStatus === "completed" || !customerEmail || pixCode !== null}
             className={`w-full py-6 text-lg font-bold bg-gradient-to-r from-[#25D366] to-[#15FF00] hover:from-[#25D366]/90 hover:to-[#15FF00]/90 text-white ${
               !isLoadingPix && paymentStatus !== "completed" && customerEmail && pixCode === null
                 ? "animate-pulse-green"
@@ -676,7 +871,7 @@ export default function CheckoutPage() {
             )}
           </Button>
 
-          {/* SEÇÃO DE SEGURANÇA AGORA DENTRO DO CARD */}
+          {/* SEÇÃO DE SEGURANÇA */}
           <div className="text-center mt-4">
             <p className="text-muted-foreground text-sm flex items-center justify-center">
               <ShieldCheck className="h-4 w-4 text-muted mr-1" />
@@ -685,15 +880,135 @@ export default function CheckoutPage() {
             <p className="text-xs text-muted-foreground mt-1">Seus dados estão protegidos por SSL de 256 bits</p>
           </div>
 
-          {/* SEÇÃO DE DEPOIMENTOS AGORA DENTRO DO CARD */}
+          {/* SEÇÃO DE DEPOIMENTOS */}
           <div className="w-full space-y-6 pt-4">
-            <h2 className="text-2xl font-bold text-center text-[#15FF00] text-glow-green">
-              O que nossos clientes dizem
-            </h2>
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold text-[#15FF00] text-glow-green flex items-center justify-center gap-3">
+                <img src="/whatsapp-testimonials.png" alt="WhatsApp" className="h-8 w-8" />O QUE NOSSOS CLIENTES DIZEM
+                <img src="/whatsapp-testimonials.png" alt="WhatsApp" className="h-8 w-8" />
+              </h2>
+              <div className="flex items-center justify-center space-x-4">
+                <div className="flex items-center bg-green-500/20 border border-green-500/50 rounded-full px-3 py-1">
+                  <ShieldCheck className="h-4 w-4 text-[#15FF00] mr-2" />
+                  <span className="text-xs font-bold text-[#15FF00]">100% Verificado</span>
+                </div>
+                <div className="flex items-center bg-green-500/20 border border-green-500/50 rounded-full px-3 py-1">
+                  <Star className="h-4 w-4 text-[#15FF00] mr-2 fill-[#15FF00]" />
+                  <span className="text-xs font-bold text-[#15FF00]">Avaliações Reais</span>
+                </div>
+              </div>
+            </div>
             <TestimonialCarousel />
+
+            {/* Updated verification text */}
+            <div className="text-center space-y-2">
+              <p className="text-xs text-muted-foreground">
+                ✅ Todas as avaliações são verificadas e autenticadas •
+                <span className="text-[#15FF00] font-bold"> +15.000 clientes satisfeitos</span>
+              </p>
+              <div className="flex items-center justify-center space-x-4 text-xs text-muted-foreground">
+                <div className="flex items-center">
+                  <ShieldCheck className="h-3 w-3 text-[#15FF00] mr-1" />
+                  <span>Identidade verificada</span>
+                </div>
+                <div className="flex items-center">
+                  <Star className="h-3 w-3 text-[#15FF00] mr-1 fill-[#15FF00]" />
+                  <span>Compra confirmada</span>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* POP-UP DE DESAFIO BÔNUS - ENTRADA */}
+      {showEntryBonus && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[60] animate-in fade-in-0 zoom-in-95">
+          <Card className="w-full max-w-md bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/50 text-card-foreground">
+            <CardContent className="p-6 space-y-4">
+              {/* Timer do desafio */}
+              <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-3 text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <Clock className="h-5 w-5 text-[#15FF00] mr-2" />
+                  <span className="text-[#15FF00] font-bold text-lg">
+                    Desafio acaba em {formatEntryBonusTime(entryBonusTimeLeft)} minutos
+                  </span>
+                </div>
+                <div className="w-full bg-green-900/30 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-[#15FF00] to-green-400 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: `${(entryBonusTimeLeft / 300) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="text-center space-y-4">
+                <div className="flex justify-center mb-2">
+                  <img src="/whatsapp-challenge.png" alt="WhatsApp" className="w-16 h-16" />
+                </div>
+                <h2 className="text-2xl font-bold text-[#15FF00] text-glow-green">🚀DESAFIO SECRETO ATIVADO!</h2>
+
+                <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-lg p-4 space-y-3">
+                  <p className="text-foreground font-semibold text-lg leading-tight">
+                    <span className="text-[#15FF00]">MISSÃO:</span> Pague seu PIX em até 5 minutos
+                  </p>
+
+                  <div className="bg-green-900/20 border border-green-500/30 rounded p-3">
+                    <p className="text-[#15FF00] font-bold text-center">🎁 RECOMPENSA: +1 Relatório Extra GRÁTIS</p>
+                    <p className="text-sm text-muted-foreground text-center mt-1">
+                      Descubra ainda mais segredos com análise dupla
+                    </p>
+                  </div>
+
+                  <p className="text-red-500 font-bold text-center animate-pulse text-lg">
+                    ⏰ Apenas quem quer saber a verdade rápido ganham essa recompensa!
+                  </p>
+                </div>
+
+                <div className="bg-muted/10 rounded-lg p-3 border border-border">
+                  <div className="flex items-center justify-center space-x-2 mb-2">
+                    <Zap className="h-4 w-4 text-yellow-500" />
+                    <span className="text-yellow-500 font-bold text-sm">O que você ganha:</span>
+                  </div>
+                  <div className="text-left space-y-1 text-sm text-muted-foreground">
+                    <p>✅ Relatório principal completo</p>
+                    <p>✅ +1 Relatório bônus (mesmo valor)</p>
+                    <p>✅ Análise dupla de segurança</p>
+                    <p>✅ Mais dados para descobrir a verdade</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Button
+                  onClick={() => {
+                    console.log("Botão clicado - fechando pop-up")
+                    setShowEntryBonus(false)
+                    setEntryBonusAccepted(true)
+                  }}
+                  className="w-full py-4 px-12 text-lg font-bold bg-transparent border-2 border-[#15FF00] text-[#15FF00] hover:bg-[#15FF00]/10 animate-pulse relative overflow-hidden group"
+                  style={{
+                    boxShadow: "0 0 20px rgba(21, 255, 0, 0.5), inset 0 0 20px rgba(21, 255, 0, 0.1)",
+                    textShadow: "0 0 10px rgba(21, 255, 0, 0.8)",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#15FF00]/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                  <div className="flex items-center justify-center relative z-10">
+                    <img src="/whatsapp-challenge.png" alt="WhatsApp" className="w-5 h-5 mr-3 relative z-10" />
+                    <span className="relative z-10 text-center">SABER DE TODA A VERDADE AGORA</span>
+                  </div>
+                </Button>
+              </div>
+
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">🎯 Desafio disponível apenas uma vez</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAIS EXISTENTES - Mantendo todos os modais anteriores */}
       {showInstructions && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-md bg-background text-foreground max-h-[90vh] overflow-y-auto border border-border">
@@ -766,16 +1081,15 @@ export default function CheckoutPage() {
                     navigator.clipboard.writeText(pixCode!)
                     alert("Código PIX copiado!")
 
-                    // Iniciar timer para mostrar pop-up após copiar (apenas se ainda não foi mostrado)
                     if (!bonusPopupShown && !bonusPopupShownAfterCopy) {
                       setBonusPopupShownAfterCopy(true)
                       setTimeout(() => {
                         if (document.visibilityState === "visible" && !showInstructions && !showBonusPopup) {
-                          setBonusTimeLeft(300) // Reset para 5 minutos
+                          setBonusTimeLeft(300)
                           setShowBonusPopup(true)
-                          setBonusPopupShown(true) // Marcar que o pop-up foi mostrado
+                          setBonusPopupShown(true)
                         }
-                      }, 7000) // 7 segundos após copiar
+                      }, 7000)
                     }
                   }}
                   className="w-full py-3 text-lg font-bold bg-gradient-to-r from-[#25D366] to-[#15FF00] hover:from-[#25D366]/90 hover:to-[#15FF00]/90 text-black animate-pulse-green"
@@ -794,11 +1108,11 @@ export default function CheckoutPage() {
           </Card>
         </div>
       )}
+
       {showOrderBumps && (
         <div className="fixed inset-0 bg-black/80 flex items-start justify-center p-2 z-50 overflow-y-auto">
           <Card className="w-full max-w-md bg-card text-card-foreground mt-4 mb-4">
             <CardContent className="p-4 space-y-4">
-              {/* Barra de escassez no topo */}
               <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-3 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <Clock className="h-4 w-4 text-[#15FF00] mr-2" />
@@ -813,7 +1127,6 @@ export default function CheckoutPage() {
                 <p className="text-muted-foreground text-xs">Aproveite essas ofertas exclusivas antes de finalizar</p>
               </div>
 
-              {/* Primeiro OrderBump */}
               <div className="border border-border rounded-lg p-3 space-y-2">
                 <div className="flex items-start space-x-2">
                   <input
@@ -834,11 +1147,12 @@ export default function CheckoutPage() {
                         ✅ 2 Investigações pelo Preço de 1 (EXCLUSIVO)
                       </h3>
                       <p className="text-muted-foreground text-sm mt-1 leading-tight">
-                        Descubra tudo sobre duas pessoas diferentes com um único clique ou descubra mais da mesma pessoa! 
+                        Descubra tudo sobre duas pessoas diferentes com um único clique ou descubra mais da mesma
+                        pessoa!
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        <span className="text-muted-foreground line-through text-xs">R$ 19,90</span>
-                        <span className="text-green-500 font-bold text-lg">R$ 9,90</span>
+                        <span className="text-muted-foreground line-through text-xs">De R$ 49,90</span>
+                        <span className="text-green-500 font-bold text-lg">R$ 19,90</span>
                         <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded">50% OFF</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
@@ -853,7 +1167,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Segundo OrderBump */}
               <div className="border border-border rounded-lg p-3 space-y-2">
                 <div className="flex items-start space-x-2">
                   <input
@@ -870,14 +1183,17 @@ export default function CheckoutPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <label htmlFor="localizacao" className="cursor-pointer">
-                      <h3 className="font-bold text-foreground text-lg leading-tight">📍 Whats Premium: Acesso Espelhado</h3>
+                      <h3 className="font-bold text-foreground text-lg leading-tight">
+                        📱 Whats Premium: Acesso Espelhado
+                      </h3>
                       <p className="text-muted-foreground text-sm mt-1 leading-tight">
-                        Veja tudo o que acontece no WhatsApp dele sem sair do seu celular. Mais praticidade, mais controle.
+                        Veja tudo o que acontece no WhatsApp dela sem ela saber no seu celular. Mais praticidade, mais
+                        controle.
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        <span className="text-muted-foreground line-through text-xs">R$ 14,90</span>
+                        <span className="text-muted-foreground line-through text-xs">De R$ 9,90</span>
                         <span className="text-green-500 font-bold text-lg">R$ 6,90</span>
-                        <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded">53% OFF</span>
+                        <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded">25% OFF</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <div className="flex items-center bg-green-500/20 border border-green-500/50 rounded px-2 py-1">
@@ -891,7 +1207,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Terceiro OrderBump */}
               <div className="border border-border rounded-lg p-3 space-y-2">
                 <div className="flex items-start space-x-2">
                   <input
@@ -908,15 +1223,16 @@ export default function CheckoutPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <label htmlFor="relatorio" className="cursor-pointer">
-                      <h3 className="font-bold text-foreground text-lg leading-tight">📊 Atualizações Secretas por 7 Dias</h3>
+                      <h3 className="font-bold text-foreground text-lg leading-tight">
+                        📊 Atualizações Secretas por 7 Dias
+                      </h3>
                       <p className="text-muted-foreground text-sm mt-1 leading-tight">
-                        Receba relatórios semanais com novos acessos e descobertas. Tudo isso sem levantar suspeitas. 
-                       🔐 Ideal pra quem quer monitoramento constante.
+                        Receba relatórios semanais detalhados sem levantar suspeitas. 😱 Ideal para acompanhar mudanças!
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
-                        <span className="text-muted-foreground line-through text-xs">R$ 19,90</span>
+                        <span className="text-muted-foreground line-through text-xs">De R$ 25,90</span>
                         <span className="text-green-500 font-bold text-lg">R$ 7,90</span>
-                        <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded">50% OFF</span>
+                        <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded">69% OFF</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <div className="flex items-center bg-green-500/20 border border-green-500/50 rounded px-2 py-1">
@@ -930,7 +1246,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Resumo do pedido - Compacto */}
               <div className="bg-muted/20 rounded-lg p-3">
                 <h4 className="font-bold text-foreground mb-2 text-sm">Resumo:</h4>
                 <div className="space-y-1 text-xs">
@@ -941,19 +1256,19 @@ export default function CheckoutPage() {
                   {selectedOrderBumps.investigacao && (
                     <div className="flex justify-between text-green-500">
                       <span>+ 2 Investigações</span>
-                      <span>R$ 9,90</span>
+                      <span>R$ 11,90</span>
                     </div>
                   )}
                   {selectedOrderBumps.localizacao && (
                     <div className="flex justify-between text-green-500">
-                      <span>+ Localização 24H</span>
+                      <span>+ Whats Premium</span>
                       <span>R$ 6,90</span>
                     </div>
                   )}
                   {selectedOrderBumps.relatorio && (
                     <div className="flex justify-between text-green-500">
-                      <span>+ Relatório Semanal</span>
-                      <span>R$ 14,90</span>
+                      <span>+ Atualizações 7 Dias</span>
+                      <span>R$ 7,90</span>
                     </div>
                   )}
                   <hr className="border-border" />
@@ -963,39 +1278,17 @@ export default function CheckoutPage() {
                       R${" "}
                       {(
                         totalAmount +
-                        (selectedOrderBumps.investigacao ? 9.9 : 0) +
+                        (selectedOrderBumps.investigacao ? 11.9 : 0) +
                         (selectedOrderBumps.localizacao ? 6.9 : 0) +
-                        (selectedOrderBumps.relatorio ? 14.9 : 0)
+                        (selectedOrderBumps.relatorio ? 7.9 : 0)
                       )
                         .toFixed(2)
                         .replace(".", ",")}
                     </span>
                   </div>
-                  {/* Seção de economia compacta */}
-                  {(selectedOrderBumps.investigacao ||
-                    selectedOrderBumps.localizacao ||
-                    selectedOrderBumps.relatorio) && (
-                    <>
-                      <hr className="border-border" />
-                      <div className="flex justify-between text-yellow-500 font-semibold text-xs">
-                        <span>💰 Economia:</span>
-                        <span>
-                          R${" "}
-                          {(
-                            (selectedOrderBumps.investigacao ? 10.0 : 0) +
-                            (selectedOrderBumps.localizacao ? 8.0 : 0) +
-                            (selectedOrderBumps.relatorio ? 15.0 : 0)
-                          )
-                            .toFixed(2)
-                            .replace(".", ",")}
-                        </span>
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
 
-              {/* Botões compactos */}
               <div className="space-y-2">
                 <Button
                   onClick={processPixGeneration}
@@ -1020,11 +1313,11 @@ export default function CheckoutPage() {
           </Card>
         </div>
       )}
+
       {showBonusPopup && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-md bg-card text-card-foreground border border-border animate-in fade-in-0 zoom-in-95">
             <CardContent className="p-6 space-y-4">
-              {/* Barra de escassez no topo */}
               <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-3 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <Clock className="h-4 w-4 text-[#15FF00] mr-2" />
@@ -1032,7 +1325,6 @@ export default function CheckoutPage() {
                     Oferta acaba em {formatBonusTime(bonusTimeLeft)} minutos
                   </span>
                 </div>
-                {/* Barra de progresso */}
                 <div className="w-full bg-green-900/30 rounded-full h-2">
                   <div
                     className="bg-gradient-to-r from-[#15FF00] to-green-400 h-2 rounded-full transition-all duration-1000"
@@ -1051,7 +1343,7 @@ export default function CheckoutPage() {
                     Análise completa de redes sociais + histórico de 3 meses
                   </p>
                   <div className="flex items-center justify-center mt-2 gap-3">
-                    <span className="text-xl font-bold text-muted-foreground line-through">R$9,90</span>
+                    <span className="text-xl font-bold text-muted-foreground line-through">R$19,90</span>
                     <span className="text-2xl font-extrabold text-[#15FF00] bg-green-400/20 px-3 py-1 rounded-full border border-green-400/50 animate-pulse">
                       GRÁTIS
                     </span>
@@ -1080,7 +1372,7 @@ export default function CheckoutPage() {
                   <p className="text-xs text-muted-foreground mb-2">
                     ⚡ Oferta válida apenas para pagamentos realizados até {(() => {
                       const now = new Date()
-                      const futureTime = new Date(now.getTime() + 5 * 60 * 1000) // +5 minutos
+                      const futureTime = new Date(now.getTime() + 5 * 60 * 1000)
                       return futureTime.toLocaleTimeString("pt-BR", {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -1093,9 +1385,95 @@ export default function CheckoutPage() {
                     variant="ghost"
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
-                    Fechar (continuar sem bônus)
+                    Fechar
                   </Button>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* POP-UP DE ALERTA APÓS 60 SEGUNDOS */}
+      {showTimeAlert && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[70] animate-in fade-in-0 zoom-in-95">
+          <Card className="w-full max-w-md bg-gradient-to-br from-red-900/20 to-orange-900/20 border border-red-500/50 text-card-foreground">
+            <CardContent className="p-6 space-y-4">
+              {/* Timer de urgência */}
+              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <Clock className="h-5 w-5 text-red-500 mr-2 animate-pulse" />
+                  <span className="text-red-500 font-bold text-lg animate-pulse">
+                    ⚠️ TEMPO ESGOTANDO: {formatTime(timeLeft)} restantes!
+                  </span>
+                </div>
+                <div className="w-full bg-red-900/30 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-red-500 to-orange-400 h-2 rounded-full transition-all duration-1000 animate-pulse"
+                    style={{ width: `${(timeLeft / 300) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="text-center space-y-4">
+                <div className="flex justify-center mb-2">
+                  <div className="text-4xl animate-bounce">⏰</div>
+                </div>
+                <h2 className="text-2xl font-bold text-red-500 animate-pulse">🚨 ÚLTIMA CHANCE!</h2>
+
+                <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/20 rounded-lg p-4 space-y-3">
+                  <p className="text-foreground font-semibold text-lg leading-tight">
+                    <span className="text-red-500">ATENÇÃO:</span> Você ainda não gerou seu PIX!
+                  </p>
+
+                  <div className="bg-red-900/20 border border-red-500/30 rounded p-3">
+                    <p className="text-yellow-500 font-bold text-center">🎁 RECOMPENSA AINDA DISPONÍVEL!</p>
+                    <p className="text-sm text-muted-foreground text-center mt-1">
+                      Gere seu PIX AGORA e ganhe +1 Relatório Extra GRÁTIS
+                    </p>
+                  </div>
+
+                  <p className="text-orange-500 font-bold text-center text-lg">
+                    ⚡ Restam apenas {formatTime(timeLeft)} minutos para garantir sua recompensa!
+                  </p>
+                </div>
+
+                <div className="bg-muted/10 rounded-lg p-3 border border-border">
+                  <div className="flex items-center justify-center space-x-2 mb-2">
+                    <Zap className="h-4 w-4 text-yellow-500" />
+                    <span className="text-yellow-500 font-bold text-sm">O que você está perdendo:</span>
+                  </div>
+                  <div className="text-left space-y-1 text-sm text-muted-foreground">
+                    <p>❌ Relatório principal completo</p>
+                    <p>❌ +1 Relatório bônus (mesmo valor)</p>
+                    <p>❌ Análise dupla de segurança</p>
+                    <p>❌ Desconto especial por tempo limitado</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Button
+                  onClick={() => {
+                    setShowTimeAlert(false)
+                    // Scroll para o campo de email
+                    document.getElementById("customerEmail")?.scrollIntoView({ behavior: "smooth" })
+                    document.getElementById("customerEmail")?.focus()
+                  }}
+                  className="w-full py-4 px-12 text-lg font-bold bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white animate-pulse relative overflow-hidden group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                  <div className="flex items-center justify-center relative z-10">
+                    <Clock className="w-5 h-5 mr-3 relative z-10" />
+                    <span className="relative z-10 text-center">PAGAR AGORA E GARANTIR BÔNUS</span>
+                  </div>
+                </Button>
+              </div>
+
+              <div className="text-center">
+                <p className="text-xs text-red-400 animate-pulse">
+                  🔥 Esta é sua última chance de garantir a recompensa!
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -1105,7 +1483,52 @@ export default function CheckoutPage() {
   )
 }
 
-/** Componente do carrossel de depoimentos */
+function TestimonialCard({ name, text }: { name: string; text: string }) {
+  return (
+    <Card className="bg-muted/20 border border-border">
+      <CardContent className="p-3 space-y-3">
+        {/* Header with stars and verification */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-1">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+            ))}
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="bg-[#15FF00] text-black text-xs px-2 py-1 rounded-full font-bold flex items-center">
+              <ShieldCheck className="h-3 w-3 mr-1 text-black" />
+              Verificado
+            </div>
+          </div>
+        </div>
+
+        {/* Review text */}
+        <p className="text-sm text-muted-foreground leading-relaxed">{text}</p>
+
+        {/* Footer with name and trust badges */}
+        <div className="flex items-center justify-between pt-2 border-t border-border/50">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+              {name.charAt(0)}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-foreground">{name}</p>
+              <p className="text-xs text-muted-foreground">Cliente verificado</p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-1">
+            <div className="bg-green-500/20 border border-green-500/50 text-green-500 text-xs px-2 py-1 rounded-full font-bold flex items-center">
+              <Star className="h-3 w-3 mr-1 fill-green-500" />
+              Original
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function TestimonialCarousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
 
@@ -1176,18 +1599,15 @@ function TestimonialCarousel() {
     },
   ]
 
-  // Auto-rotação do carrossel
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % testimonials.length)
-    }, 10000) // Alterado de 7000 para 10000 (10 segundos)
-
+    }, 10_000)
     return () => clearInterval(interval)
   }, [testimonials.length])
 
-  // Mostrar 3 depoimentos por vez
   const getVisibleTestimonials = () => {
-    const visible = []
+    const visible: typeof testimonials = []
     for (let i = 0; i < 3; i++) {
       const index = (currentIndex + i) % testimonials.length
       visible.push(testimonials[index])
@@ -1198,19 +1618,18 @@ function TestimonialCarousel() {
   return (
     <div className="space-y-4">
       <div className="grid gap-4">
-        {getVisibleTestimonials().map((testimonial, index) => (
-          <TestimonialCard key={`${currentIndex}-${index}`} name={testimonial.name} text={testimonial.text} />
+        {getVisibleTestimonials().map((t, idx) => (
+          <TestimonialCard key={`${currentIndex}-${idx}`} name={t.name} text={t.text} />
         ))}
       </div>
 
-      {/* Indicadores do carrossel */}
       <div className="flex justify-center space-x-2">
-        {Array.from({ length: Math.ceil(testimonials.length / 3) }).map((_, index) => (
+        {Array.from({ length: Math.ceil(testimonials.length / 3) }).map((_, idx) => (
           <button
-            key={index}
-            onClick={() => setCurrentIndex(index * 3)}
+            key={idx}
+            onClick={() => setCurrentIndex(idx * 3)}
             className={`w-2 h-2 rounded-full transition-colors ${
-              Math.floor(currentIndex / 3) === index ? "bg-[#15FF00]" : "bg-muted-foreground/30"
+              Math.floor(currentIndex / 3) === idx ? "bg-[#15FF00]" : "bg-muted-foreground/30"
             }`}
           />
         ))}
@@ -1219,29 +1638,11 @@ function TestimonialCarousel() {
   )
 }
 
-/** Componente auxiliar das estatísticas */
 function Stat({ value, label }: { value: React.ReactNode; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <span className="text-pink-500 text-3xl font-bold">{value}</span>
-      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className="text-2xl font-bold text-foreground">{value}</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
     </div>
-  )
-}
-
-/** Componente auxiliar para os depoimentos */
-function TestimonialCard({ name, text }: { name: string; text: string }) {
-  return (
-    <Card className="p-4 bg-card shadow-sm rounded-lg border border-border">
-      <CardContent className="p-0">
-        <div className="flex items-center mb-2">
-          {[...Array(5)].map((_, i) => (
-            <Star key={i} className="h-5 w-5 fill-yellow-500 text-yellow-500" />
-          ))}
-          <span className="font-semibold text-foreground ml-2">{name}</span>
-        </div>
-        <p className="text-muted-foreground italic text-sm">"{text}"</p>
-      </CardContent>
-    </Card>
   )
 }
